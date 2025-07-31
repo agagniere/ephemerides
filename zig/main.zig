@@ -53,7 +53,7 @@ var gpa_instance: std.heap.GeneralPurposeAllocator(.{}) = .init;
 const gpa = gpa_instance.allocator();
 var accumulator: SatelliteAccumulator = .empty;
 
-const Warning = enum(u4) { MissingMessage };
+const Warning = enum(u4) { MissingMessage, InvalidSubframe };
 var seen_warnings: std.StaticBitSet(@typeInfo(Warning).@"enum".fields.len) = .initEmpty();
 
 inline fn show_warning_once(warning: Warning, text: []const u8, args: anytype) void {
@@ -107,6 +107,7 @@ fn c_ublox_callback(message: [*c]o2s.ublox_message_t) callconv(.C) void {
     receive_ublox_subframe(subframe) catch |err| {
         switch (err) {
             error.MissingMessage => show_warning_once(.MissingMessage, "Unsupported GNSS message: {s} {}", .{ o2s.ublox_constellation_to_cstring(subframe.constellation), subframe.signal }),
+            error.InvalidSubframe => show_warning_once(.InvalidSubframe, "Unsupported subframe in {s} {}", .{ o2s.ublox_constellation_to_cstring(subframe.constellation), subframe.signal }),
             else => log.errAt(@src(), "Error: {s}. Subframe: {any}", .{ @errorName(err), subframe }),
         }
     };
