@@ -67,9 +67,9 @@ For now only one message type per constellation has been transcribed:
 | ✅ | Glonass | | L1, L2 | | [unavco.org/ICD_GLONASS_5.0_en.pdf](https://www.unavco.org/help/glossary/docs/ICD_GLONASS_5.0_(2002)_en.pdf)
 | ✅ | BeiDou | D1 | B1I, B3I | MEO/IGSO | [beidou.gov.cn/ICD/OpenServiceSignalB1I.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/201902/P020190227702348791891.pdf) [beidou.gov.cn/ICD/OpenServiceSignalB3I.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/201806/P020180608516798097666.pdf) 5.2
 | | BeiDou | D2 | B1I, B3I | GEO | [beidou.gov.cn/ICD/OpenServiceSignalB1I.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/201902/P020190227702348791891.pdf) [beidou.gov.cn/ICD/OpenServiceSignalB3I.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/201806/P020180608516798097666.pdf) 5.3
-| | BeiDou | B-CNAV1 | B1C | | [beidou.gov.cn/ICD/OpenServiceSignalB1C.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/201806/P020180608519640359959.pdf)
-| | BeiDou | B-CNAV2 | B2a | | [beidou.gov.cn/ICD/OpenServiceSignalB2a.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/201806/P020180608518432765621.pdf)
-| | BeiDou | B-CNAV3 | B2b-I | | [beidou.gov.cn/ICD/OpenServiceSignalB2b.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/202008/P020231201537880833625.pdf)
+| | BeiDou | B-CNAV1 | B1C | MEO/IGSO | [beidou.gov.cn/ICD/OpenServiceSignalB1C.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/201806/P020180608519640359959.pdf)
+| | BeiDou | B-CNAV2 | B2a | MEO/IGSO | [beidou.gov.cn/ICD/OpenServiceSignalB2a.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/201806/P020180608518432765621.pdf)
+| | BeiDou | B-CNAV3 | B2b-I | MEO/IGSO | [beidou.gov.cn/ICD/OpenServiceSignalB2b.pdf](http://en.beidou.gov.cn/SYSTEMS/ICD/202008/P020231201537880833625.pdf)
 
 ## Navigation Data
 
@@ -132,6 +132,8 @@ Note that the ICD mappings in the YAMLs are agnostic of the receiver, as they de
 ### u-blox
 
 For a list of GNSS messages supported by F9P receivers, see [u-blox.com/u-blox-F9-HPG-1.51_InterfaceDescription.pdf](https://content.u-blox.com/sites/default/files/documents/u-blox-F9-HPG-1.51_InterfaceDescription_UBXDOC-963802114-13124.pdf) section 1.5.4 page 20. To get raw messages we use the `RXM-SFRBX` messages. The general words layout per constellation is described in [u-blox.com/ZED-F9P_IntegrationManual_UBX.pdf](https://content.u-blox.com/sites/default/files/ZED-F9P_IntegrationManual_UBX-18010802.pdf) from page 74 to 81
+
+Note: ublox documents reference B2I BeiDou signals. These are specific the the BeiDou-2 regional system, documented in older ICDs only.
 
 #### Ordering
 
