@@ -204,8 +204,8 @@ def handler_to_zig(self, output: TextIO):
         with writer.function('get_key', [ZigVariable('self', 'Self')], 'Key', True) as func:
             func.write_line('return switch (self) {')
             paged = sorted('.' + simplify(message.name) for message in self.messages.values() if message.page_header)
-            func.write_line(f"\tinline {', '.join(paged)} => |this|" + ' .{.subframe = this.get_id(), .page = this.get_page_number()},')
-            func.write_line('\tinline else => |this| .{.subframe = this.get_id()}')
+            func.write_line(f"\tinline {', '.join(paged)} => |this|" + ' .{.subframe = this.header.subframe_id, .page = this.get_page_number()},')
+            func.write_line('\tinline else => |this| .{.subframe = this.header.subframe_id}')
             func.write_line('};')
         with writer.function('from_ublox', [ZigVariable('messageType', 'GnssMessageType'), ZigVariable('words', '[]u32')], '!Self', True) as func:
             func.write_line('return switch (messageType) {')
@@ -305,8 +305,6 @@ def format_to_zig(self, writer: ZigWriter):
                     else:
                         func.const('data', 'try .init(&reader, header.subframe_id)', Type='Data')
                     func.write_line(f"return .{'{'}{', '.join(members)}{'}'};")
-            with writer.function('get_id', [ZigVariable('self', '@This()')], 'u8', public=True, inline=True) as func:
-                func.write_line('return self.header.subframe_id;')
             if self.page_header:
                 with writer.function('get_page_number', [ZigVariable('self', '@This()')], '?u8', public=True, inline=True) as func:
                     func.write_line('return if (self.page_header) |page_header| page_header.page_id else null;')
