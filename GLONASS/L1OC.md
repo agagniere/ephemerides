@@ -32,6 +32,8 @@ subframe_id|4|24|8
 |:------:|:---|---:|:-----|:--:|
 |`0`|idle_chip|1|||
 
+Completed by the values deduced by ublox: `superframe`, `subframe_id`
+
 ## Header extension for paged subframes
 
 4 bits mapped as follows:

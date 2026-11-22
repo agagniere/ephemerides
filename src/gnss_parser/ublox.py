@@ -41,8 +41,6 @@ class Ublox:
                 self.per_word[word] = x
         self.count = max(self.per_word.keys())
         self.fields = fields
-        # When ublox provides the subframe ID, it is used instead of the header's
-        self.subframe_id = next((f for f in fields if f.name == 'subframe_id'), None)
 
     @classmethod
     def from_icd(cls, icd: dict):
