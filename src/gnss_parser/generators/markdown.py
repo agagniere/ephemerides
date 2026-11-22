@@ -34,7 +34,7 @@ def format_to_markdown(self):
     lines.append('## Header')
     lines.append(parser_to_markdown(self.header))
     if self.ublox and self.ublox.fields:
-        lines.append(f"Completed by the values deduced by ublox: {', '.join(f'`{f.name}`' for f in self.ublox.fields)}")
+        lines.append(f"Completed by the values deduced by the receiver: {', '.join(f'`{f.name}`' for f in self.ublox.fields)}")
     if self.page_header:
         lines.append('## Header extension for paged subframes')
         lines.append(parser_to_markdown(self.page_header))

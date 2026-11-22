@@ -316,22 +316,22 @@ def ublox_to_zig(self, reader_name: str, writer: ZigWriter):
     to_keep = [self.per_word[i].keep for i in range(1, self.count + 1)]
     writer.const(Zig.identifier(reader_name), f'SkippingBitReader({self.count}, u32, {Zig.array(to_skip)}, {Zig.array(to_keep)})')
 
-def field_array_to_zig(self, struct_name: str, function_name: str, reader_name: str, writer: ZigWriter, ublox = None):
+def field_array_to_zig(self, struct_name: str, function_name: str, reader_name: str, writer: ZigWriter, receiver = None):
     """
-    When ublox is provided, the values it deduced are made part of the resulting struct
+    When a receiver section is provided, the values it deduced are made part of the resulting struct
     """
-    ublox_fields = ublox.fields if ublox else []
+    deduced_fields = receiver.fields if receiver else []
     with writer.struct(struct_name) as struct:
         for field in self.fields:
             if field.name and field.value is None:
                 struct.add_member(field_to_zigvar(field))
-        for field in ublox_fields:
-            struct.add_member(ZigVariable(field.name, f'u{field.keep}', comment='deduced by ublox'))
+        for field in deduced_fields:
+            struct.add_member(ZigVariable(field.name, f'u{field.keep}', comment='deduced by the receiver'))
     parameters = [ZigVariable('reader', reader_name)]
-    if ublox_fields:
-        parameters.append(ZigVariable('words', f'[{ublox.count}]u32'))
+    if deduced_fields:
+        parameters.append(ZigVariable('words', f'[{receiver.count}]u32'))
     with writer.function(function_name, parameters, f'!{struct_name}', False) as func:
-        needs_result = bool(ublox_fields) or any(map(lambda f: f.name and f.value is None, self.fields))
+        needs_result = bool(deduced_fields) or any(map(lambda f: f.name and f.value is None, self.fields))
         if needs_result:
             func.var('result', struct_name, 'undefined');
         for field in self.fields:
@@ -344,7 +344,7 @@ def field_array_to_zig(self, struct_name: str, function_name: str, reader_name: 
                 func.write_line(f'std.debug.assert(try {consume} == {field.value});')
             else:
                 func.write_line(f'{dest} = try {consume};')
-        for field in ublox_fields:
+        for field in deduced_fields:
             field_reader = f'{field.name}_reader'
             func.var(field_reader, f'SkippingBitReader(1, u32, {Zig.array([field.discard_msb])}, {Zig.array([field.keep])})',
                      f".init({Zig.array([f'words[{field.word - 1}]'])})")

@@ -92,13 +92,13 @@ class GnssFormat(SimpleNamespace):
                 result.format_list.append(FormatData(min(subframes), 0, subframes, None, parser, description))
                 logging.debug(f"Added format message {constellation} {messageName} > Subframe(s) {subframes}")
         header = FieldArray.from_icd(icd['header'])
-        # Fields deduced by ublox are part of the header, so the subframe ID can come from either
+        # Fields deduced by the receiver are part of the header, so the subframe ID can come from either
         transmitted = {f.name for f in header.fields if f.name}
         deduced = {f.name for f in result.ublox.fields} if result.ublox else set()
         if transmitted & deduced:
-            raise Exception(f'Header fields of {messageName} both transmitted and deduced by ublox: {transmitted & deduced}')
+            raise Exception(f'Header fields of {messageName} both transmitted and deduced by the receiver: {transmitted & deduced}')
         if 'subframe_id' not in transmitted | deduced:
-            raise Exception(f'{messageName} has no subframe_id, neither in its header nor deduced by ublox')
+            raise Exception(f'{messageName} has no subframe_id, neither in its header nor deduced by the receiver')
         return cls(messageName, Constellation[constellation], header, **result.__dict__)
 
     def parse_subframe(self, reader, extra_header = None):
