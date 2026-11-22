@@ -319,6 +319,11 @@ def ublox_to_zig(self, reader_name: str, writer: ZigWriter):
 def field_array_to_zig(self, struct_name: str, function_name: str, reader_name: str, writer: ZigWriter, receiver = None):
     """
     When a receiver section is provided, the values it deduced are made part of the resulting struct
+
+    Note that the generated code is not receiver agnostic: like every read_ function, it takes the
+    concrete Reader of the only receiver supported, and the deduced values are read assuming ublox's
+    layout of 32-bit words. Supporting another receiver would require making the read_ functions generic
+    (e.g. taking the reader as anytype), and moving the reading of deduced values to receiver specific code.
     """
     deduced_fields = receiver.fields if receiver else []
     with writer.struct(struct_name) as struct:
