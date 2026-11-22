@@ -90,6 +90,15 @@ class GnssFormat(SimpleNamespace):
                     result.per_subframe[subframe] = parser
                 result.format_list.append(FormatData(min(subframes), 0, subframes, None, parser, description))
                 logging.debug(f"Added format message {constellation} {messageName} > Subframe(s) {subframes}")
+        # Subframe IDs defined by the ICD, implemented or not. Defaults to the implemented ones
+        if 'valid_subframes' in icd:
+            result.valid_subframes = RangeList(icd['valid_subframes'])
+            undeclared = result.per_subframe.keys() - result.valid_subframes.as_set
+            if undeclared:
+                raise Exception(f'Subframes {sorted(undeclared)} of {messageName} are implemented but missing from valid_subframes')
+        else:
+            result.valid_subframes = RangeList.from_values(result.per_subframe.keys())
+        result.unimplemented_subframes = RangeList.from_values(result.valid_subframes.as_set - result.per_subframe.keys())
         return cls(messageName, Constellation[constellation], FieldArray.from_icd(icd['header']), **result.__dict__)
 
     def parse_subframe(self, reader):
@@ -97,6 +106,8 @@ class GnssFormat(SimpleNamespace):
         len_header = reader.count
         if not hasattr(header, 'subframe_id'):
             raise Exception('No subframe ID in header')
+        if header.subframe_id in self.unimplemented_subframes:
+            raise Exception(f'Subframe ID not implemented yet: {header.subframe_id}')
         if header.subframe_id not in self.per_subframe:
             raise Exception(f'No such subframe ID: {header.subframe_id}')
         if header.subframe_id not in self.paged_subframes:

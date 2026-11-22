@@ -3,6 +3,8 @@
 Translation from the ICD to the YAML:
 - word type -> subframe_id
 
+Subframes defined by the ICD but not transcribed yet: 0, 6 to 10, 16 to 20, 22, 63
+
 ## Ublox words layout
 
 Galileo INAV corresponds to gnssId 2, sigId 1, 5

@@ -5,6 +5,8 @@ metadata:
   description: |
     Translation from the ICD to the YAML:
     - word type -> subframe_id
+# Word types defined in OS SIS ICD v2.2 sections 4.3.5 and 4.3.6: 0 is spare, 63 is dummy
+valid_subframes: [[0, 10], [16, 20], 22, 63]
 ublox:
   signal: [1, 5]
   layout:

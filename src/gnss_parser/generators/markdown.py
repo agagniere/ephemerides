@@ -29,6 +29,8 @@ def format_to_markdown(self):
     lines = [f'# {self.constellation.name} {self.name}']
     if self.description:
         lines.append(self.description)
+    if self.unimplemented_subframes:
+        lines.append(f'Subframes defined by the ICD but not transcribed yet: {self.unimplemented_subframes}')
     if self.ublox:
         lines.append(ublox_to_markdown(self.ublox, self))
     lines.append('## Header')

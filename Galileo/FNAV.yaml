@@ -8,6 +8,8 @@ metadata:
     and other system messages, such as almanacs and health status messages.
 
     Note that compared to the ICD, the notion of page and subframe has been swapped here
+# Page types defined in OS SIS ICD v2.2 sections 4.2.4 and 4.2.5: 63 is dummy
+valid_subframes: [[1, 6], 63]
 ublox:
   signal: 3
   layout:

@@ -1,11 +1,20 @@
 from typing import TextIO
 import re
 
+from gnss_parser.yaml import RangeList
+
 class Zig:
 
     @staticmethod
     def array(array: list) -> str:
         return '.{' + ','.join(map(str, array)) + '}'
+
+    @staticmethod
+    def switch_items(values: RangeList) -> str:
+        """
+        [0, [6, 8], 63] -> "0, 6...8, 63"
+        """
+        return ', '.join(str(a) if a == b else f'{a}...{b}' for a, b in values.as_ranges)
 
     @staticmethod
     def identifier(identifier: str) -> str:
@@ -274,6 +283,8 @@ def format_to_zig(self, writer: ZigWriter):
                         func.write_line('\t},')
                     else:
                         func.write_line(f"\t{subframe} => .{'{'} .subframe{child} = try read_subframe{child}(reader) {'}'},")
+                if self.unimplemented_subframes:
+                    func.write_line(f'\t{Zig.switch_items(self.unimplemented_subframes)} => error.UnimplementedSubframe,')
                 func.write_line('\telse => error.InvalidSubframe')
                 func.write_line('};')
         namespace.empty_line()

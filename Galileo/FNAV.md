@@ -6,6 +6,8 @@ and other system messages, such as almanacs and health status messages.
 
 Note that compared to the ICD, the notion of page and subframe has been swapped here
 
+Subframes defined by the ICD but not transcribed yet: 5, 6, 63
+
 ## Ublox words layout
 
 Galileo FNAV corresponds to gnssId 2, sigId 3

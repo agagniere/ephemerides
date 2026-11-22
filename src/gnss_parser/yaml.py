@@ -33,15 +33,34 @@ class RangeList:
         if isinstance(iterable, int):
             iterable = [iterable]
         self.as_list = []
+        self.as_ranges = []
         self.human_readable = []
         for element in iterable:
             if isinstance(element, list):
                 self.as_list += range(element[0], element[1] + 1)
+                self.as_ranges.append((element[0], element[1]))
                 self.human_readable.append(f'{element[0]} to {element[1]}')
             else:
                 self.as_list.append(element)
+                self.as_ranges.append((element, element))
                 self.human_readable.append(str(element))
         self.as_set = set(self.as_list)
+
+    @classmethod
+    def from_values(cls, values):
+        """
+        {0, 5, 6, 8, 9, 10, 63} -> [0, 5, 6, [8, 10], 63]
+        """
+        compact = []
+        for value in sorted(values):
+            if compact and compact[-1][1] == value - 1:
+                compact[-1][1] = value
+            else:
+                compact.append([value, value])
+        result = []
+        for a, b in compact:
+            result += [[a, b]] if b - a >= 2 else range(a, b + 1)
+        return cls(result)
 
     def __iter__(self):
         return self.as_list.__iter__()
