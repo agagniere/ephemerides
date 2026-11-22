@@ -18,10 +18,15 @@ ublox:
       keep: 13 # 77 data bits
     - words: 4
       keep: 0
-  subframe_id:
-    word: 4
-    discard_msb: 24
-    keep: 8
+  # Deduced by the receiver, 0 when unknown (ZED-F9P integration manual, 3.15.1.3)
+  fields:
+    - name: superframe
+      word: 4
+      keep: 16
+    - name: subframe_id # frame number
+      word: 4
+      discard_msb: 24
+      keep: 8
 header:
   - name: idle_chip
     bits: 1

@@ -17,7 +17,12 @@ Words|MSB skipped|Data bits|LSB skipped
 3|0|13|19
 4|0|0|32
 
-ublox places the subframe ID in word 4, after 24 MSB, on 8 bits
+Values deduced by the receiver rather than transmitted:
+
+Name|Word|MSB skipped|Bits
+:-|-:|-:|-:
+superframe|4|0|16
+subframe_id|4|24|8
 
 ## Header
 

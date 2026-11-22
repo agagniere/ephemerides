@@ -284,9 +284,12 @@ def format_to_zig(self, writer: ZigWriter):
             func.write_line('\telse => false')
             func.write_line('};')
         namespace.empty_line()
+        ublox_fields = self.ublox.fields if self.ublox else []
+        if ublox_fields:
+            ublox_fields_to_zig(self.ublox, namespace)
         with namespace.struct(f'Subframe') as struct:
-            if self.ublox and self.ublox.subframe_id:
-                struct.add_member(ZigVariable('id', 'u8'))
+            if ublox_fields:
+                struct.add_member(ZigVariable('ublox', 'UbloxFields'))
             struct.add_member(ZigVariable('reader', f'Reader'))
             struct.add_member(ZigVariable('header', f'Header'))
             if self.page_header:
@@ -294,21 +297,14 @@ def format_to_zig(self, writer: ZigWriter):
             struct.add_member(ZigVariable('data', f'Data'))
             struct.empty_line()
             if self.ublox:
-                if self.ublox.subframe_id:
-                    struct.const('IDReader', f'SkippingBitReader(1, u32, {Zig.array([self.ublox.subframe_id.discard_msb])}, {Zig.array([self.ublox.subframe_id.keep])})');
-                    struct.empty_line()
                 with writer.function('from_ublox', [ZigVariable('words', f'[{self.ublox.count}]u32')], '!@This()', True) as func:
                     func.var('reader', 'Reader', '.init(words)')
                     func.const('header', 'try read_header(&reader)', Type='Header')
                     members = ['.reader = reader', '.header = header', '.data = data']
-                    if self.ublox.subframe_id:
-                        func.var('id_reader', 'IDReader',
-                                 f".init({Zig.array([f'words[{self.ublox.subframe_id.word - 1}]'])})")
-                        func.const('id', f"try id_reader.consume({self.ublox.subframe_id.keep}, u8)")
-                        members.append(f".id = id")
-                        idname = 'id'
-                    else:
-                        idname = 'header.subframe_id'
+                    if ublox_fields:
+                        func.const('ublox', 'try read_ublox_fields(words)', Type='UbloxFields')
+                        members.append('.ublox = ublox')
+                    idname = 'ublox.subframe_id' if self.ublox.subframe_id else 'header.subframe_id'
                     if self.page_header:
                         func.var('page_header', '?PageHeader', 'null')
                         func.write_line(f'if (is_paged({idname}))')
@@ -320,12 +316,27 @@ def format_to_zig(self, writer: ZigWriter):
                     func.write_line(f"return .{'{'}{', '.join(members)}{'}'};")
             with writer.function('get_id', [ZigVariable('self', '@This()')], 'u8', public=True, inline=True) as func:
                 if self.ublox and self.ublox.subframe_id:
-                    func.write_line('return self.id;')
+                    func.write_line('return self.ublox.subframe_id;')
                 else:
                     func.write_line('return self.header.subframe_id;')
             if self.page_header:
                 with writer.function('get_page_number', [ZigVariable('self', '@This()')], '?u8', public=True, inline=True) as func:
                     func.write_line('return if (self.page_header) |page_header| page_header.page_id else null;')
+
+def ublox_fields_to_zig(self, writer: ZigWriter):
+    """
+    Values deduced by the receiver, each read from a single ublox word
+    """
+    with writer.struct('UbloxFields') as struct:
+        struct.add_members(ZigVariable(field.name, f'u{field.keep}') for field in self.fields)
+    with writer.function('read_ublox_fields', [ZigVariable('words', f'[{self.count}]u32')], '!UbloxFields') as func:
+        func.var('result', 'UbloxFields', 'undefined')
+        for field in self.fields:
+            reader = f'{field.name}_reader'
+            func.var(reader, f'SkippingBitReader(1, u32, {Zig.array([field.discard_msb])}, {Zig.array([field.keep])})',
+                     f".init({Zig.array([f'words[{field.word - 1}]'])})")
+            func.write_line(f'result.{Zig.identifier(field.name)} = try {reader}.consume({field.keep}, u{field.keep});')
+        func.write_line('return result;')
 
 def ublox_to_zig(self, reader_name: str, writer: ZigWriter):
     to_skip = [self.per_word[i].discard_msb for i in range(1, self.count + 1)]

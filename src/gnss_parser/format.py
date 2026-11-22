@@ -30,14 +30,15 @@ class GnssFormatHandler:
                 self.ublox_mapping[message.constellation.value, signal] = message.name
         self.per_constellation[message.constellation].append(message)
 
-    def parse_subframe(self, message_name: str, reader):
-        return self.messages[message_name].parse_subframe(reader)
+    def parse_subframe(self, message_name: str, reader, extra_header = None):
+        return self.messages[message_name].parse_subframe(reader, extra_header)
 
     def parse_ublox_subframe(self, gnssId: int, sigId: int, words: bytes):
         if (gnssId, sigId) not in self.ublox_mapping:
             raise Exception(f'Unknown ublox (consellation, signal) combination ({gnssId}, {sigId})')
         message = self.ublox_mapping[gnssId, sigId]
-        return message, *self.parse_subframe(message, reader_from_ublox[message](words))
+        ublox_fields = self.messages[message].ublox.read_fields(words)
+        return message, *self.parse_subframe(message, reader_from_ublox[message](words), ublox_fields)
 
 FormatData = namedtuple('FormatData', ['min_subframe', 'min_page', 'subframes', 'pages', 'parser', 'description'])
 
@@ -92,9 +93,11 @@ class GnssFormat(SimpleNamespace):
                 logging.debug(f"Added format message {constellation} {messageName} > Subframe(s) {subframes}")
         return cls(messageName, Constellation[constellation], FieldArray.from_icd(icd['header']), **result.__dict__)
 
-    def parse_subframe(self, reader):
+    def parse_subframe(self, reader, extra_header = None):
         header = self.header.parse(reader)
         len_header = reader.count
+        if extra_header:
+            header.__dict__.update(extra_header.__dict__)
         if not hasattr(header, 'subframe_id'):
             raise Exception('No subframe ID in header')
         if header.subframe_id not in self.per_subframe:

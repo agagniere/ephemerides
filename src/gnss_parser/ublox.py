@@ -4,6 +4,7 @@ Ublox-specific
 
 import logging
 from collections import namedtuple
+from types import SimpleNamespace
 
 from more_itertools import grouper
 
@@ -12,11 +13,17 @@ from gnss_parser.bits import (SingleWordBitReaderMsb, append_lsb, discard_lsb,
                               keep_lsb, xor_bits)
 from gnss_parser.yaml import RangeList, ensure_fields
 
-class SingleField(namedtuple('SingleField', ['word', 'discard_msb', 'keep'])):
+class UbloxField(namedtuple('UbloxField', ['name', 'word', 'discard_msb', 'keep'])):
+    """
+    A value deduced by the receiver, that ublox appends to the transmitted data
+    """
     @classmethod
     def from_icd(cls, icd: dict):
-        ensure_fields('ublox special field', icd, ['word', 'keep'])
-        return cls(word=icd['word'], keep=icd['keep'], discard_msb=icd.get('discard_msb', 0))
+        ensure_fields('ublox field', icd, ['name', 'word', 'keep'])
+        return cls(name=icd['name'], word=icd['word'], keep=icd['keep'], discard_msb=icd.get('discard_msb', 0))
+
+    def read(self, words: list[int]) -> int:
+        return keep_lsb(self.keep, discard_lsb(32 - self.discard_msb - self.keep, words[self.word - 1]))
 
 class UbloxLayout(namedtuple('UbloxLayout', ['words', 'discard_msb', 'keep'])):
     @classmethod
@@ -25,7 +32,7 @@ class UbloxLayout(namedtuple('UbloxLayout', ['words', 'discard_msb', 'keep'])):
         return cls(words=RangeList(icd['words']), keep=icd['keep'], discard_msb=icd.get('discard_msb', 0))
 
 class Ublox:
-    def __init__(self, signal: int | list, layout: list[UbloxLayout], subframe_id: None | SingleField):
+    def __init__(self, signal: int | list, layout: list[UbloxLayout], fields: list[UbloxField]):
         self.signal = RangeList(signal)
         self.layout = layout
         self.per_word = {}
@@ -33,14 +40,20 @@ class Ublox:
             for word in x.words:
                 self.per_word[word] = x
         self.count = max(self.per_word.keys())
-        self.subframe_id = subframe_id
+        self.fields = fields
+        # When ublox provides the subframe ID, it is used instead of the header's
+        self.subframe_id = next((f for f in fields if f.name == 'subframe_id'), None)
 
     @classmethod
     def from_icd(cls, icd: dict):
         ensure_fields('ublox', icd, ['signal', 'layout'])
         return cls(signal = icd['signal'],
                    layout = list(map(UbloxLayout.from_icd, icd['layout'])),
-                   subframe_id = SingleField.from_icd(icd['subframe_id']) if 'subframe_id' in icd else None)
+                   fields = list(map(UbloxField.from_icd, icd.get('fields', []))))
+
+    def read_fields(self, byte_array: bytes) -> SimpleNamespace:
+        words = little_endian_32(byte_array)
+        return SimpleNamespace(**{field.name: field.read(words) for field in self.fields})
 
     def __str__(self):
         return f'[signal: {self.signal}, layout: {self.layout}]'
