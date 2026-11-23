@@ -33,6 +33,8 @@ def format_to_markdown(self):
         lines.append(ublox_to_markdown(self.ublox, self))
     lines.append('## Header')
     lines.append(parser_to_markdown(self.header))
+    if self.ublox and self.ublox.fields:
+        lines.append(f"Completed by the values deduced by the receiver: {', '.join(f'`{f.name}`' for f in self.ublox.fields)}")
     if self.page_header:
         lines.append('## Header extension for paged subframes')
         lines.append(parser_to_markdown(self.page_header))
@@ -56,6 +58,9 @@ def ublox_to_markdown(self, parent_format):
     lines += ['|'.join(['Words', 'MSB skipped', 'Data bits', 'LSB skipped']), '|'.join([':-', '-:', '-:', '-:'])]
     for layout in self.layout:
         lines.append('|'.join(map(str, [layout.words, layout.discard_msb, layout.keep, 32 - (layout.discard_msb + layout.keep)])))
-    if self.subframe_id:
-        lines += ['', f'ublox places the subframe ID in word {self.subframe_id.word}, after {self.subframe_id.discard_msb} MSB, on {self.subframe_id.keep} bits']
+    if self.fields:
+        lines += ['', 'Values deduced by the receiver rather than transmitted:', '']
+        lines += ['|'.join(['Name', 'Word', 'MSB skipped', 'Bits']), '|'.join([':-', '-:', '-:', '-:'])]
+        for field in self.fields:
+            lines.append('|'.join(map(str, [field.name, field.word, field.discard_msb, field.keep])))
     return '\n'.join(lines)

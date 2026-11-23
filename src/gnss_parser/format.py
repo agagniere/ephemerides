@@ -30,14 +30,15 @@ class GnssFormatHandler:
                 self.ublox_mapping[message.constellation.value, signal] = message.name
         self.per_constellation[message.constellation].append(message)
 
-    def parse_subframe(self, message_name: str, reader):
-        return self.messages[message_name].parse_subframe(reader)
+    def parse_subframe(self, message_name: str, reader, extra_header = None):
+        return self.messages[message_name].parse_subframe(reader, extra_header)
 
     def parse_ublox_subframe(self, gnssId: int, sigId: int, words: bytes):
         if (gnssId, sigId) not in self.ublox_mapping:
             raise Exception(f'Unknown ublox (consellation, signal) combination ({gnssId}, {sigId})')
         message = self.ublox_mapping[gnssId, sigId]
-        return message, *self.parse_subframe(message, reader_from_ublox[message](words))
+        ublox_fields = self.messages[message].ublox.read_fields(words)
+        return message, *self.parse_subframe(message, reader_from_ublox[message](words), ublox_fields)
 
 FormatData = namedtuple('FormatData', ['min_subframe', 'min_page', 'subframes', 'pages', 'parser', 'description'])
 
@@ -90,11 +91,21 @@ class GnssFormat(SimpleNamespace):
                     result.per_subframe[subframe] = parser
                 result.format_list.append(FormatData(min(subframes), 0, subframes, None, parser, description))
                 logging.debug(f"Added format message {constellation} {messageName} > Subframe(s) {subframes}")
-        return cls(messageName, Constellation[constellation], FieldArray.from_icd(icd['header']), **result.__dict__)
+        header = FieldArray.from_icd(icd['header'])
+        # Fields deduced by the receiver are part of the header, so the subframe ID can come from either
+        transmitted = {f.name for f in header.fields if f.name}
+        deduced = {f.name for f in result.ublox.fields} if result.ublox else set()
+        if transmitted & deduced:
+            raise Exception(f'Header fields of {messageName} both transmitted and deduced by the receiver: {transmitted & deduced}')
+        if 'subframe_id' not in transmitted | deduced:
+            raise Exception(f'{messageName} has no subframe_id, neither in its header nor deduced by the receiver')
+        return cls(messageName, Constellation[constellation], header, **result.__dict__)
 
-    def parse_subframe(self, reader):
+    def parse_subframe(self, reader, extra_header = None):
         header = self.header.parse(reader)
         len_header = reader.count
+        if extra_header:
+            header.__dict__.update(extra_header.__dict__)
         if not hasattr(header, 'subframe_id'):
             raise Exception('No subframe ID in header')
         if header.subframe_id not in self.per_subframe:

@@ -204,8 +204,8 @@ def handler_to_zig(self, output: TextIO):
         with writer.function('get_key', [ZigVariable('self', 'Self')], 'Key', True) as func:
             func.write_line('return switch (self) {')
             paged = sorted('.' + simplify(message.name) for message in self.messages.values() if message.page_header)
-            func.write_line(f"\tinline {', '.join(paged)} => |this|" + ' .{.subframe = this.get_id(), .page = this.get_page_number()},')
-            func.write_line('\tinline else => |this| .{.subframe = this.get_id()}')
+            func.write_line(f"\tinline {', '.join(paged)} => |this|" + ' .{.subframe = this.header.subframe_id, .page = this.get_page_number()},')
+            func.write_line('\tinline else => |this| .{.subframe = this.header.subframe_id}')
             func.write_line('};')
         with writer.function('from_ublox', [ZigVariable('messageType', 'GnssMessageType'), ZigVariable('words', '[]u32')], '!Self', True) as func:
             func.write_line('return switch (messageType) {')
@@ -243,7 +243,7 @@ def format_to_zig(self, writer: ZigWriter):
         formats = []
         if self.ublox:
             ublox_to_zig(self.ublox, 'Reader', namespace)
-        field_array_to_zig(self.header, 'Header', 'read_header', '*Reader', namespace)
+        field_array_to_zig(self.header, 'Header', 'read_header', '*Reader', namespace, self.ublox)
         if self.page_header:
             field_array_to_zig(self.page_header, 'PageHeader', 'read_page_header', '*Reader', namespace)
         for fmt in self.format_list:
@@ -285,8 +285,6 @@ def format_to_zig(self, writer: ZigWriter):
             func.write_line('};')
         namespace.empty_line()
         with namespace.struct(f'Subframe') as struct:
-            if self.ublox and self.ublox.subframe_id:
-                struct.add_member(ZigVariable('id', 'u8'))
             struct.add_member(ZigVariable('reader', f'Reader'))
             struct.add_member(ZigVariable('header', f'Header'))
             if self.page_header:
@@ -294,35 +292,19 @@ def format_to_zig(self, writer: ZigWriter):
             struct.add_member(ZigVariable('data', f'Data'))
             struct.empty_line()
             if self.ublox:
-                if self.ublox.subframe_id:
-                    struct.const('IDReader', f'SkippingBitReader(1, u32, {Zig.array([self.ublox.subframe_id.discard_msb])}, {Zig.array([self.ublox.subframe_id.keep])})');
-                    struct.empty_line()
                 with writer.function('from_ublox', [ZigVariable('words', f'[{self.ublox.count}]u32')], '!@This()', True) as func:
                     func.var('reader', 'Reader', '.init(words)')
-                    func.const('header', 'try read_header(&reader)', Type='Header')
+                    func.const('header', f"try read_header(&reader{', words' if self.ublox.fields else ''})", Type='Header')
                     members = ['.reader = reader', '.header = header', '.data = data']
-                    if self.ublox.subframe_id:
-                        func.var('id_reader', 'IDReader',
-                                 f".init({Zig.array([f'words[{self.ublox.subframe_id.word - 1}]'])})")
-                        func.const('id', f"try id_reader.consume({self.ublox.subframe_id.keep}, u8)")
-                        members.append(f".id = id")
-                        idname = 'id'
-                    else:
-                        idname = 'header.subframe_id'
                     if self.page_header:
                         func.var('page_header', '?PageHeader', 'null')
-                        func.write_line(f'if (is_paged({idname}))')
-                        func.write_line(f'\tpage_header = try read_page_header(&reader);')
+                        func.write_line('if (is_paged(header.subframe_id))')
+                        func.write_line('\tpage_header = try read_page_header(&reader);')
                         members.append('.page_header = page_header')
-                        func.const('data', f'try .init(&reader, {idname}, if (page_header) |hdr| hdr.page_id else null)', Type='Data')
+                        func.const('data', 'try .init(&reader, header.subframe_id, if (page_header) |hdr| hdr.page_id else null)', Type='Data')
                     else:
-                        func.const('data', f'try .init(&reader, {idname})', Type='Data')
+                        func.const('data', 'try .init(&reader, header.subframe_id)', Type='Data')
                     func.write_line(f"return .{'{'}{', '.join(members)}{'}'};")
-            with writer.function('get_id', [ZigVariable('self', '@This()')], 'u8', public=True, inline=True) as func:
-                if self.ublox and self.ublox.subframe_id:
-                    func.write_line('return self.id;')
-                else:
-                    func.write_line('return self.header.subframe_id;')
             if self.page_header:
                 with writer.function('get_page_number', [ZigVariable('self', '@This()')], '?u8', public=True, inline=True) as func:
                     func.write_line('return if (self.page_header) |page_header| page_header.page_id else null;')
@@ -332,13 +314,27 @@ def ublox_to_zig(self, reader_name: str, writer: ZigWriter):
     to_keep = [self.per_word[i].keep for i in range(1, self.count + 1)]
     writer.const(Zig.identifier(reader_name), f'SkippingBitReader({self.count}, u32, {Zig.array(to_skip)}, {Zig.array(to_keep)})')
 
-def field_array_to_zig(self, struct_name: str, function_name: str, reader_name: str, writer: ZigWriter):
+def field_array_to_zig(self, struct_name: str, function_name: str, reader_name: str, writer: ZigWriter, receiver = None):
+    """
+    When a receiver section is provided, the values it deduced are made part of the resulting struct
+
+    Note that the generated code is not receiver agnostic: like every read_ function, it takes the
+    concrete Reader of the only receiver supported, and the deduced values are read assuming ublox's
+    layout of 32-bit words. Supporting another receiver would require making the read_ functions generic
+    (e.g. taking the reader as anytype), and moving the reading of deduced values to receiver specific code.
+    """
+    deduced_fields = receiver.fields if receiver else []
     with writer.struct(struct_name) as struct:
         for field in self.fields:
             if field.name and field.value is None:
                 struct.add_member(field_to_zigvar(field))
-    with writer.function(function_name, [ZigVariable('reader', reader_name)], f'!{struct_name}', False) as func:
-        needs_result = any(map(lambda f: f.name and field.value is None, self.fields))
+        for field in deduced_fields:
+            struct.add_member(ZigVariable(field.name, f'u{field.keep}', comment='deduced by the receiver'))
+    parameters = [ZigVariable('reader', reader_name)]
+    if deduced_fields:
+        parameters.append(ZigVariable('words', f'[{receiver.count}]u32'))
+    with writer.function(function_name, parameters, f'!{struct_name}', False) as func:
+        needs_result = bool(deduced_fields) or any(map(lambda f: f.name and f.value is None, self.fields))
         if needs_result:
             func.var('result', struct_name, 'undefined');
         for field in self.fields:
@@ -351,6 +347,11 @@ def field_array_to_zig(self, struct_name: str, function_name: str, reader_name: 
                 func.write_line(f'std.debug.assert(try {consume} == {field.value});')
             else:
                 func.write_line(f'{dest} = try {consume};')
+        for field in deduced_fields:
+            field_reader = f'{field.name}_reader'
+            func.var(field_reader, f'SkippingBitReader(1, u32, {Zig.array([field.discard_msb])}, {Zig.array([field.keep])})',
+                     f".init({Zig.array([f'words[{field.word - 1}]'])})")
+            func.write_line(f'result.{Zig.identifier(field.name)} = try {field_reader}.consume({field.keep}, u{field.keep});')
         func.write_line('return result;' if needs_result else 'return .{};');
 
 def field_type(self) -> str:
